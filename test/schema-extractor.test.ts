@@ -63,4 +63,38 @@ describe("extractSchemas", () => {
     expect(schemas[0].fullSchema.properties).toHaveProperty("apiVersion");
     expect(schemas[0].fullSchema.properties).toHaveProperty("spec");
   });
+
+  it("should extract statusSchema from CRD with status", () => {
+    const crd = loadCrd("status-crd.yaml");
+    const schemas = extractSchemas(crd);
+
+    expect(schemas[0].statusSchema).toBeDefined();
+    expect(schemas[0].statusSchema!.type).toBe("object");
+    expect(schemas[0].statusSchema!.properties).toHaveProperty("ready");
+    expect(schemas[0].statusSchema!.properties).toHaveProperty("phase");
+    expect(schemas[0].statusSchema!.properties).toHaveProperty(
+      "availableReplicas",
+    );
+  });
+
+  it("should return undefined statusSchema when not present", () => {
+    const crd = loadCrd("sample-crd.yaml");
+    const schemas = extractSchemas(crd);
+
+    expect(schemas[0].statusSchema).toBeUndefined();
+  });
+
+  it("should extract shortNames from CRD", () => {
+    const crd = loadCrd("short-names-crd.yaml");
+    const schemas = extractSchemas(crd);
+
+    expect(schemas[0].shortNames).toEqual(["cert", "certs"]);
+  });
+
+  it("should provide empty shortNames array when not present", () => {
+    const crd = loadCrd("sample-crd.yaml");
+    const schemas = extractSchemas(crd);
+
+    expect(schemas[0].shortNames).toEqual([]);
+  });
 });

@@ -1,4 +1,16 @@
-import type { JSONSchema } from "json-schema-to-typescript";
+export interface JSONSchema {
+  readonly type?: string;
+  readonly properties?: Readonly<Record<string, JSONSchema>>;
+  readonly required?: readonly string[];
+  readonly items?: JSONSchema;
+  readonly additionalProperties?: JSONSchema | boolean;
+  readonly allOf?: readonly JSONSchema[];
+  readonly enum?: readonly unknown[];
+  readonly default?: unknown;
+  readonly description?: string;
+  readonly format?: string;
+  readonly [key: string]: unknown;
+}
 
 export interface CrdVersion {
   readonly name: string;
@@ -38,7 +50,9 @@ export interface ExtractedSchema {
   readonly version: string;
   readonly scope: "Namespaced" | "Cluster";
   readonly plural: string;
+  readonly shortNames: readonly string[];
   readonly specSchema: JSONSchema | undefined;
+  readonly statusSchema: JSONSchema | undefined;
   readonly fullSchema: JSONSchema;
 }
 
@@ -46,7 +60,5 @@ export interface GeneratedCode {
   readonly group: string;
   readonly version: string;
   readonly kind: string;
-  readonly types: string;
-  readonly factory: string;
   readonly fullModule: string;
 }

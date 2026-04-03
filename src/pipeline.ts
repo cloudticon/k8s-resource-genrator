@@ -1,39 +1,27 @@
 import { parseCrdYaml, parseCrdFile } from "./crd-parser.js";
 import { extractSchemas } from "./schema-extractor.js";
-import { generateSpecType } from "./type-generator.js";
-import {
-  generateOptsInterface,
-  generateFactory,
-  buildImports,
-} from "./factory-generator.js";
+import { generateResourceCall } from "./factory-generator.js";
 import { buildModuleContent, emitGeneratedCode } from "./code-emitter.js";
 import type { GeneratedCode, ExtractedSchema } from "./types.js";
 
-const processSchema = async (
-  schema: ExtractedSchema,
-): Promise<GeneratedCode> => {
-  const types = await generateSpecType(schema);
-  const imports = buildImports(schema);
-  const optsInterface = generateOptsInterface(schema);
-  const factory = generateFactory(schema);
-  const fullModule = buildModuleContent(imports, types, optsInterface, factory);
+const processSchema = (schema: ExtractedSchema): GeneratedCode => {
+  const resourceCall = generateResourceCall(schema);
+  const fullModule = buildModuleContent(resourceCall);
 
   return {
     group: schema.group,
     version: schema.version,
     kind: schema.kind,
-    types,
-    factory,
     fullModule,
   };
 };
 
-export const generateFromYaml = async (
+export const generateFromYaml = (
   yamlContent: string,
-): Promise<readonly GeneratedCode[]> => {
+): readonly GeneratedCode[] => {
   const crds = parseCrdYaml(yamlContent);
   const schemas = crds.flatMap(extractSchemas);
-  return Promise.all(schemas.map(processSchema));
+  return schemas.map(processSchema);
 };
 
 export const generateFromFile = async (
@@ -41,7 +29,7 @@ export const generateFromFile = async (
 ): Promise<readonly GeneratedCode[]> => {
   const crds = await parseCrdFile(filePath);
   const schemas = crds.flatMap(extractSchemas);
-  return Promise.all(schemas.map(processSchema));
+  return schemas.map(processSchema);
 };
 
 export const generateAndEmit = async (

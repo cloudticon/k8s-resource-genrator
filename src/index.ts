@@ -1,11 +1,7 @@
 export { parseCrdYaml, parseCrdFile } from "./crd-parser.js";
 export { extractSchemas } from "./schema-extractor.js";
-export { generateSpecType, generateFullType } from "./type-generator.js";
-export {
-  generateOptsInterface,
-  generateFactory,
-  buildImports,
-} from "./factory-generator.js";
+export { openAPIToZ, generateObjectShape, resolveAllOf } from "./type-generator.js";
+export { generateResourceCall } from "./factory-generator.js";
 export { emitGeneratedCode, buildModuleContent } from "./code-emitter.js";
 export {
   generateFromYaml,
@@ -13,6 +9,7 @@ export {
   generateAndEmit,
 } from "./pipeline.js";
 export type {
+  JSONSchema,
   CrdDocument,
   CrdVersion,
   CrdNames,

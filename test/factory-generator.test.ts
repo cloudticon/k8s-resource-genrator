@@ -3,11 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseCrdYaml } from "../src/crd-parser.js";
 import { extractSchemas } from "../src/schema-extractor.js";
-import {
-  generateOptsInterface,
-  generateFactory,
-  buildImports,
-} from "../src/factory-generator.js";
+import { generateResourceCall } from "../src/factory-generator.js";
 
 const FIXTURE_DIR = resolve(import.meta.dirname, "fixtures");
 
@@ -17,77 +13,115 @@ const getSchema = (name: string, idx = 0) => {
   return extractSchemas(crds[0])[idx];
 };
 
-describe("generateOptsInterface", () => {
-  it("should generate opts with name, labels, annotations for namespaced resource", () => {
+describe("generateResourceCall", () => {
+  it("should generate resource() call for namespaced CRD", () => {
     const schema = getSchema("sample-crd.yaml");
-    const opts = generateOptsInterface(schema);
+    const result = generateResourceCall(schema);
 
-    expect(opts).toContain("export interface CertificateOpts");
-    expect(opts).toContain("name: string");
-    expect(opts).toContain("namespace?: string");
-    expect(opts).toContain("labels?: Record<string, string>");
-    expect(opts).toContain("annotations?: Record<string, string>");
-    expect(opts).toContain("spec: CertificateSpec");
+    expect(result).toContain(
+      'export const certificate = resource("cert-manager.io/v1", "Certificate"',
+    );
+    expect(result).toContain('scope: "Namespaced"');
+    expect(result).toContain("spec:");
+    expect(result).toContain("z.string()");
   });
 
-  it("should omit namespace for cluster-scoped resources", () => {
+  it("should generate resource() call for cluster-scoped CRD", () => {
     const schema = getSchema("cluster-scoped-crd.yaml");
-    const opts = generateOptsInterface(schema);
+    const result = generateResourceCall(schema);
 
-    expect(opts).toContain("export interface ClusterIssuerOpts");
-    expect(opts).toContain("name: string");
-    expect(opts).not.toContain("namespace");
-    expect(opts).toContain("spec: ClusterIssuerSpec");
-  });
-});
-
-describe("generateFactory", () => {
-  it("should generate factory function for namespaced CRD", () => {
-    const schema = getSchema("sample-crd.yaml");
-    const factory = generateFactory(schema);
-
-    expect(factory).toContain("export function certificate(opts: CertificateOpts)");
-    expect(factory).toContain('apiVersion: "cert-manager.io/v1"');
-    expect(factory).toContain('kind: "Certificate"');
-    expect(factory).toContain("return resource(");
-    expect(factory).toContain("ResourceManifest");
-    expect(factory).toContain("opts.namespace");
-    expect(factory).toContain("spec: opts.spec");
+    expect(result).toContain(
+      'export const clusterIssuer = resource("cert-manager.io/v1", "ClusterIssuer"',
+    );
+    expect(result).toContain('scope: "Cluster"');
   });
 
-  it("should generate factory function for cluster-scoped CRD", () => {
-    const schema = getSchema("cluster-scoped-crd.yaml");
-    const factory = generateFactory(schema);
-
-    expect(factory).toContain("export function clusterIssuer(opts: ClusterIssuerOpts)");
-    expect(factory).toContain("return resourceClusterScope(");
-    expect(factory).toContain("ClusterScopedResourceManifest");
-    expect(factory).not.toContain("opts.namespace");
-  });
-
-  it("should use lowercase first letter for function name", () => {
+  it("should use lowercase first letter for variable name", () => {
     const schema = getSchema("multi-version-crd.yaml");
-    const factory = generateFactory(schema);
+    const result = generateResourceCall(schema);
 
-    expect(factory).toContain("export function widget(");
+    expect(result).toContain("export const widget = resource(");
   });
-});
 
-describe("buildImports", () => {
-  it("should import resource for namespaced CRD", () => {
+  it("should include spec schema as z.* calls", () => {
     const schema = getSchema("sample-crd.yaml");
-    const imports = buildImports(schema);
+    const result = generateResourceCall(schema);
 
-    expect(imports).toContain("resource");
-    expect(imports).toContain("ResourceManifest");
-    expect(imports).toContain("@cloudticon/ct-k8s-resources");
+    expect(result).toContain("secretName: z.string(),");
+    expect(result).toContain("z.object(");
+    expect(result).toContain("z.array(");
   });
 
-  it("should import resourceClusterScope for cluster-scoped CRD", () => {
-    const schema = getSchema("cluster-scoped-crd.yaml");
-    const imports = buildImports(schema);
+  it("should mark required and optional fields correctly", () => {
+    const schema = getSchema("sample-crd.yaml");
+    const result = generateResourceCall(schema);
 
-    expect(imports).toContain("resourceClusterScope");
-    expect(imports).toContain("ClusterScopedResourceManifest");
+    expect(result).toContain("secretName: z.string(),");
+    expect(result).toContain("duration: z.string().optional(),");
+    expect(result).toContain("isCA: z.boolean().optional(),");
+  });
+
+  it("should include enum types", () => {
+    const schema = getSchema("sample-crd.yaml");
+    const result = generateResourceCall(schema);
+
+    expect(result).toContain('z.enum(["Issuer","ClusterIssuer"])');
+  });
+
+  it("should include nested object schemas", () => {
+    const schema = getSchema("sample-crd.yaml");
+    const result = generateResourceCall(schema);
+
+    expect(result).toContain("issuerRef: z.object({");
+    expect(result).toContain("name: z.string(),");
+  });
+
+  it("should include shortNames when present", () => {
+    const schema = getSchema("short-names-crd.yaml");
+    const result = generateResourceCall(schema);
+
+    expect(result).toContain('shortNames: ["cert","certs"]');
+  });
+
+  it("should omit shortNames when empty", () => {
+    const schema = getSchema("sample-crd.yaml");
+    const result = generateResourceCall(schema);
+
+    expect(result).not.toContain("shortNames");
+  });
+
+  it("should include status schema when present", () => {
+    const schema = getSchema("status-crd.yaml");
+    const result = generateResourceCall(schema);
+
+    expect(result).toContain("status:");
+    expect(result).toContain("ready: z.boolean().optional(),");
+    expect(result).toContain(
+      'phase: z.enum(["Pending","Running","Failed"]).optional(),',
+    );
+    expect(result).toContain("availableReplicas: z.number().optional(),");
+  });
+
+  it("should omit status when not present", () => {
+    const schema = getSchema("sample-crd.yaml");
+    const result = generateResourceCall(schema);
+
+    const lines = result.split("\n");
+    const statusLines = lines.filter((l) => l.trim().startsWith("status:"));
+    expect(statusLines).toHaveLength(0);
+  });
+
+  it("should handle default values", () => {
+    const schema = getSchema("status-crd.yaml");
+    const result = generateResourceCall(schema);
+
+    expect(result).toContain("replicas: z.number().default(1),");
+  });
+
+  it("should handle enum inside array", () => {
+    const schema = getSchema("sample-crd.yaml");
+    const result = generateResourceCall(schema);
+
+    expect(result).toContain("usages: z.array(z.enum(");
   });
 });

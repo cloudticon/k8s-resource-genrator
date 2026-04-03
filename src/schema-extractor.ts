@@ -1,12 +1,12 @@
-import type { JSONSchema } from "json-schema-to-typescript";
-import type { CrdDocument, ExtractedSchema } from "./types.js";
+import type { JSONSchema, CrdDocument, ExtractedSchema } from "./types.js";
 
-const extractSpecSchema = (
+const extractPropertySchema = (
   fullSchema: JSONSchema,
+  property: string,
 ): JSONSchema | undefined => {
-  const specProp = fullSchema.properties?.["spec"];
-  if (!specProp || typeof specProp === "boolean") return undefined;
-  return specProp as JSONSchema;
+  const prop = fullSchema.properties?.[property];
+  if (!prop || typeof prop === "boolean") return undefined;
+  return prop as JSONSchema;
 };
 
 const extractOneVersion = (
@@ -22,7 +22,9 @@ const extractOneVersion = (
     version: version.name,
     scope: crd.spec.scope,
     plural: crd.spec.names.plural,
-    specSchema: extractSpecSchema(fullSchema),
+    shortNames: crd.spec.names.shortNames ?? [],
+    specSchema: extractPropertySchema(fullSchema, "spec"),
+    statusSchema: extractPropertySchema(fullSchema, "status"),
     fullSchema,
   };
 };
