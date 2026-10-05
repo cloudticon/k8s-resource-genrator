@@ -97,4 +97,51 @@ describe("extractSchemas", () => {
 
     expect(schemas[0].shortNames).toEqual([]);
   });
+
+  it("should leave topLevelSchema undefined when only spec/status exist", () => {
+    const crd = loadCrd("status-crd.yaml");
+    const schemas = extractSchemas(crd);
+
+    expect(schemas[0].topLevelSchema).toBeUndefined();
+  });
+
+  it("should extract root fields of a kind without spec into topLevelSchema", () => {
+    const crd = loadCrd("core-configmap.yaml");
+    const [schema] = extractSchemas(crd);
+
+    expect(schema.specSchema).toBeUndefined();
+    expect(schema.topLevelSchema).toEqual({
+      type: "object",
+      properties: {
+        binaryData: {
+          type: "object",
+          additionalProperties: { type: "string", format: "byte" },
+        },
+        data: {
+          type: "object",
+          additionalProperties: { type: "string" },
+        },
+        immutable: { type: "boolean" },
+      },
+    });
+  });
+
+  it("should keep only root-field names in topLevelSchema.required", () => {
+    const crd = loadCrd("cluster-role-binding.yaml");
+    const [schema] = extractSchemas(crd);
+
+    expect(Object.keys(schema.topLevelSchema!.properties!)).toEqual([
+      "roleRef",
+      "subjects",
+    ]);
+    expect(schema.topLevelSchema!.required).toEqual(["roleRef"]);
+  });
+
+  it("should extract root fields that sit next to spec", () => {
+    const crd = loadCrd("top-level-and-spec-crd.yaml");
+    const [schema] = extractSchemas(crd);
+
+    expect(schema.specSchema!.properties).toHaveProperty("target");
+    expect(Object.keys(schema.topLevelSchema!.properties!)).toEqual(["data"]);
+  });
 });

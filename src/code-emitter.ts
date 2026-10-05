@@ -15,7 +15,8 @@ const IMPORT_LINE =
   'import { resource, z } from "https://github.com/cloudticon/k8s@master";';
 
 const buildFilePath = (outputDir: string, code: GeneratedCode): string => {
-  const groupDir = code.group.replace(/\./g, "-");
+  // The core group has an empty name; keep its files under "core/".
+  const groupDir = (code.group || "core").replace(/\./g, "-");
   return join(outputDir, groupDir, `${code.version}.ts`);
 };
 

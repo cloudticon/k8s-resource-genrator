@@ -124,4 +124,83 @@ describe("generateResourceCall", () => {
 
     expect(result).toContain("usages: z.array(z.enum(");
   });
+
+  it("should use plain version as apiVersion for the core group", () => {
+    const schema = getSchema("core-configmap.yaml");
+    const result = generateResourceCall(schema);
+
+    expect(result).toContain(
+      'export const configMap = resource("v1", "ConfigMap", {',
+    );
+    expect(result).not.toContain("core/v1");
+  });
+
+  it("should treat an empty group as the core group", () => {
+    const schema = { ...getSchema("core-configmap.yaml"), group: "" };
+    const result = generateResourceCall(schema);
+
+    expect(result).toContain('resource("v1", "ConfigMap"');
+  });
+
+  it("should keep group/version for named groups", () => {
+    const schema = getSchema("cluster-role-binding.yaml");
+    const result = generateResourceCall(schema);
+
+    expect(result).toContain(
+      'resource("rbac.authorization.k8s.io/v1", "ClusterRoleBinding"',
+    );
+  });
+
+  it("should put root fields of a kind without spec in topLevel", () => {
+    const schema = getSchema("core-configmap.yaml");
+    const result = generateResourceCall(schema);
+
+    expect(result).toBe(
+      [
+        'export const configMap = resource("v1", "ConfigMap", {',
+        '  scope: "Namespaced",',
+        "  topLevel: {",
+        "    binaryData: z.record(z.string()).optional(),",
+        "    data: z.record(z.string()).optional(),",
+        "    immutable: z.boolean().optional(),",
+        "  },",
+        "});",
+      ].join("\n"),
+    );
+  });
+
+  it("should keep required root fields required in topLevel", () => {
+    const schema = getSchema("cluster-role-binding.yaml");
+    const result = generateResourceCall(schema);
+
+    expect(result).toContain('scope: "Cluster"');
+    expect(result).toContain("  topLevel: {\n    roleRef: z.object({");
+    expect(result).toContain("    subjects: z.array(z.object({");
+    expect(result).not.toContain("spec:");
+  });
+
+  it("should emit both spec and topLevel when a CRD has both", () => {
+    const schema = getSchema("top-level-and-spec-crd.yaml");
+    const result = generateResourceCall(schema);
+
+    expect(result).toContain(
+      "  spec: {\n    target: z.string().optional(),\n  },",
+    );
+    expect(result).toContain(
+      "  topLevel: {\n    data: z.record(z.string()).optional(),\n  },",
+    );
+    expect(result).toContain("  status: {");
+  });
+
+  it("should keep an empty spec when a CRD declares no fields at all", () => {
+    const schema = {
+      ...getSchema("sample-crd.yaml"),
+      specSchema: undefined,
+      topLevelSchema: undefined,
+    };
+    const result = generateResourceCall(schema);
+
+    expect(result).toContain("  spec: {},");
+    expect(result).not.toContain("topLevel");
+  });
 });

@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { generateFromYaml } from "../src/pipeline.js";
+import { emitGeneratedCode } from "../src/code-emitter.js";
 
 const FIXTURE_DIR = resolve(import.meta.dirname, "fixtures");
 const readFixture = (name: string) =>
@@ -72,5 +74,32 @@ describe("generateFromYaml", () => {
     const mod = codes[0].fullModule;
 
     expect(mod).toContain('shortNames: ["cert","certs"]');
+  });
+
+  it("should generate a spec-less core kind with topLevel fields", () => {
+    const yaml = readFixture("core-configmap.yaml");
+    const codes = generateFromYaml(yaml);
+    const mod = codes[0].fullModule;
+
+    expect(mod).toContain('export const configMap = resource("v1", "ConfigMap"');
+    expect(mod).toContain("topLevel: {");
+    expect(mod).not.toContain("spec:");
+  });
+});
+
+describe("emitGeneratedCode", () => {
+  it("should write core group (named or empty) files under core/", async () => {
+    const outDir = mkdtempSync(join(tmpdir(), "crd2ts-"));
+    const codes = [
+      { group: "core", version: "v1", kind: "ConfigMap", fullModule: "" },
+      { group: "", version: "v2", kind: "Thing", fullModule: "" },
+    ];
+
+    const written = await emitGeneratedCode(outDir, codes);
+
+    expect(written).toEqual([
+      join(outDir, "core", "v1.ts"),
+      join(outDir, "core", "v2.ts"),
+    ]);
   });
 });

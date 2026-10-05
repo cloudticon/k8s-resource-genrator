@@ -53,6 +53,11 @@ export interface ExtractedSchema {
   readonly shortNames: readonly string[];
   readonly specSchema: JSONSchema | undefined;
   readonly statusSchema: JSONSchema | undefined;
+  /**
+   * Root-level fields other than apiVersion/kind/metadata/spec/status,
+   * e.g. ConfigMap `data` or Role `rules`. Undefined when there are none.
+   */
+  readonly topLevelSchema: JSONSchema | undefined;
   readonly fullSchema: JSONSchema;
 }
 
